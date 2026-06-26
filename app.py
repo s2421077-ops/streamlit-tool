@@ -4,23 +4,36 @@ import plotly.express as px
 import time
 import csv
 import os
+import gspread
+from google.oauth2.service_account import Credentials
 
 
 from datetime import datetime
 
 def generate_participant_id():
 
-    if os.path.exists("results.csv"):
+    SCOPES = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
 
-        df = pd.read_csv("results.csv")
+    credentials = Credentials.from_service_account_file(
+        "decisionresearch-500605-73a493461f0a.json",
+        scopes=SCOPES
+    )
 
-        next_id = len(df) + 1
+    gc = gspread.authorize(credentials)
 
-    else:
+    worksheet = gc.open_by_key(
+        "1a8mgDmXMbDDgIJNYidBJidHBo_kRCq7c8J2lY69jlBI"
+    ).sheet1
 
-        next_id = 1
+    data = worksheet.get_all_values()
+
+    next_id = max(1, len(data))
 
     return f"P{next_id:05d}"
+
 
 def save_result():
 
@@ -34,6 +47,26 @@ def save_result():
     ) as f:
 
         writer = csv.writer(f)
+
+        # ----------------------
+        # Google Sheets接続
+        # ----------------------
+
+        SCOPES = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+
+        credentials = Credentials.from_service_account_file(
+            "decisionresearch-500605-73a493461f0a.json",
+            scopes=SCOPES
+        )
+
+        gc = gspread.authorize(credentials)
+
+        worksheet = gc.open_by_key(
+            "1a8mgDmXMbDDgIJNYidBJidHBo_kRCq7c8J2lY69jlBI"
+        ).sheet1
 
         if not file_exists:
 
@@ -102,6 +135,8 @@ def save_result():
             row.append(answer["choice"])
 
         writer.writerow(row)
+
+        worksheet.append_row(row)
 
 from streamlit_autorefresh import st_autorefresh
 
@@ -1016,6 +1051,8 @@ elif st.session_state.page == "result":
     )
 
     st.divider()
+
+    st.success("ご協力ありがとうございました。")
 
     st.subheader("アンケートのお願い")
 
