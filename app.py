@@ -10,23 +10,47 @@ from google.oauth2.service_account import Credentials
 
 from datetime import datetime
 
-def generate_participant_id():
+# ----------------------
+# Google Sheets接続（起動時に1回だけ）
+# ----------------------
+
+@st.cache_resource
+def get_worksheet():
 
     SCOPES = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
 
-    credentials = Credentials.from_service_account_file(
-        "decisionresearch-500605-73a493461f0a.json",
-        scopes=SCOPES
-    )
+    if os.path.exists(
+        "decisionresearch-500605-a9bf642a1426.json"
+    ):
+
+        credentials = (
+            Credentials.from_service_account_file(
+                "decisionresearch-500605-a9bf642a1426.json",
+                scopes=SCOPES
+            )
+        )
+
+    else:
+
+        credentials = (
+            Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"],
+                scopes=SCOPES
+            )
+        )
 
     gc = gspread.authorize(credentials)
 
-    worksheet = gc.open_by_key(
+    return gc.open_by_key(
         "1a8mgDmXMbDDgIJNYidBJidHBo_kRCq7c8J2lY69jlBI"
     ).sheet1
+
+
+worksheet = get_worksheet()
+def generate_participant_id():
 
     data = worksheet.get_all_values()
 
@@ -47,26 +71,6 @@ def save_result():
     ) as f:
 
         writer = csv.writer(f)
-
-        # ----------------------
-        # Google Sheets接続
-        # ----------------------
-
-        SCOPES = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-
-        credentials = Credentials.from_service_account_file(
-            "decisionresearch-500605-73a493461f0a.json",
-            scopes=SCOPES
-        )
-
-        gc = gspread.authorize(credentials)
-
-        worksheet = gc.open_by_key(
-            "1a8mgDmXMbDDgIJNYidBJidHBo_kRCq7c8J2lY69jlBI"
-        ).sheet1
 
         if not file_exists:
 
@@ -172,6 +176,9 @@ if "stress_answers" not in st.session_state:
 
 if "start_time" not in st.session_state:
     st.session_state.start_time = None
+
+if "current_stress_question" not in st.session_state:
+    st.session_state.current_stress_question = None
 
 # ----------------------
 # 初期化
@@ -475,7 +482,12 @@ elif st.session_state.page == "stress":
 
     TIME_LIMIT = 5
 
-    if st.session_state.start_time is None:
+    if (
+        "current_stress_question" not in st.session_state
+         or st.session_state.current_stress_question != idx
+    ):
+
+        st.session_state.current_stress_question = idx
         st.session_state.start_time = time.time()
 
     elapsed = time.time() - st.session_state.start_time
@@ -1088,6 +1100,11 @@ elif st.session_state.page == "result":
         st.session_state.stress_answers = []
 
         st.session_state.start_time = None
+
+        st.session_state.start_time = None
+
+        # ストレス問題番号のリセット
+        st.session_state.current_stress_question = None
 
          # 新しい参加者IDを発行
         st.session_state.participant_id = (
